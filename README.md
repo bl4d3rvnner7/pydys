@@ -37,7 +37,7 @@ Perfect for reverse engineering, malware analysis, CTF challenges, and understan
   - [JSON Output Format](#json-output-format)
 - [Configuration](#configuration)
 - [Internals & How It Works](#internals--how-it-works)
-- [Roadmap / TODO](#roadmap--todo)
+- [TODO](#todo)
 - [Troubleshooting](#troubleshooting)
   - [Common Issues](#common-issues)
   - [Version Mismatch](#version-mismatch)
@@ -309,7 +309,7 @@ Everything is handled inside `pydys.py` with color-coded terminal output and no 
 
 ---
 
-## 🧠 Roadmap / TODO
+## TODO
 
 ### v1.0 (Current Goal – Stabilität first)
 
