@@ -37,6 +37,7 @@ Perfect for reverse engineering, malware analysis, CTF challenges, and understan
   - [JSON Output Format](#json-output-format)
 - [Configuration](#configuration)
 - [Internals & How It Works](#internals--how-it-works)
+- [Roadmap / TODO](#roadmap--todo)
 - [Troubleshooting](#troubleshooting)
   - [Common Issues](#common-issues)
   - [Version Mismatch](#version-mismatch)
@@ -305,6 +306,44 @@ The script:
 10. **Handles Exceptions** - Preserves exception table information in output
 
 Everything is handled inside `pydys.py` with color-coded terminal output and no external dependencies except `colorama` for cross-platform colors.
+
+---
+
+## 🧠 Roadmap / TODO
+
+### v1.0 (Current Goal – Stabilität first)
+
+* [x] Recursive disassembly von Code Objects
+* [x] Function signature reconstruction (basic)
+* [x] Import detection
+* [x] Requirements extraction
+* [x] JSON export
+* [x] Version detection via magic numbers
+* [x] Nested object traversal
+
+### v1.1 (Quality & Accuracy)
+
+* [ ] Improve class detection heuristics
+* [ ] Basic decorator detection (`@dataclass`, `@staticmethod`, etc.)
+* [ ] Better signature reconstruction (kwargs, defaults)
+* [ ] Cleaner opcode formatting (remove noise completely)
+* [ ] Improved error reporting (warnings instead of crashes)
+
+### v1.2 (Semantic Understanding)
+
+* [ ] Method type detection:
+  * [ ] instance method (`self`)
+  * [ ] classmethod (`cls`)
+  * [ ] staticmethod
+* [ ] Dataclass detection (heuristic-based)
+* [ ] Attribute reconstruction (class fields)
+* [ ] Better import resolution (alias tracking)
+
+### Known Limitations
+
+* Bytecode is version-dependent → exact Python version required
+* Heuristic-based reconstruction is not always accurate
+* `dis` module may fail on malformed or obfuscated bytecode
 
 ---
 
