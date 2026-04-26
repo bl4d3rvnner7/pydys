@@ -247,6 +247,7 @@ class Pydis:
         next_code_is_dataclass = False
 
         for instruction in dis.Bytecode(code, show_caches=True):
+            printed = False
             try:
                 # Skip noisy modern opcodes
                 if instruction.opname in ("CACHE", "RESUME", "PRECALL", "RETURN_GENERATOR", "KW_NAMES"):
@@ -271,9 +272,7 @@ class Pydis:
                 else:
                     color = self.COLOR_WHITE
 
-                line = f"{' ' * indent}{offset:4d} {self.colorize(opname.ljust(20), color)} {argrepr}"
-                print(line)
-                self.assembly_string += f"\n{' ' * indent}{offset:4d} {opname.ljust(20)} {argrepr}"
+                
 
                 # Deep recursion for every nested code object
                 if instruction.opname == 'LOAD_CONST' and isinstance(instruction.argval, type(code)):
@@ -285,18 +284,24 @@ class Pydis:
 
                 # LOAD_ATTR cleaning
                 elif instruction.opname == 'LOAD_ATTR':
-                    cleaned = re.sub(r'\.?NULL(.*?)\+ ', '.', argrepr)
+                    cleaned = re.sub(r'\s*\+\s*NULL(\|self)?', '', argrepr)
                     cleaned = re.sub(r'\.+', '.', cleaned)
-                    print(f"{' ' * indent}{offset:4d} {self.colorize(opname.ljust(20), self.COLOR_GREEN)} {cleaned}")
-                    self.assembly_string += f"\n{' ' * indent}{offset:4d} {opname.ljust(20)} {cleaned}"
+
+                    print(f"{' ' * indent}{instruction.offset:4d} {self.colorize(instruction.opname.ljust(20), self.COLOR_GREEN)} {cleaned}")
+                    self.assembly_string += f"\n{' ' * indent}{instruction.offset:4d} {instruction.opname.ljust(20)} {cleaned}"
+                    printed = True
+                    continue
 
                 # LOAD_GLOBAL cleaning
                 elif instruction.opname == 'LOAD_GLOBAL':
-                    attr = re.sub(r'\.?NULL(.*?)\+ ', '', argrepr)
+                    attr = re.sub(r'\s*\+\s*NULL(\|self)?', '', argrepr)
                     if attr.startswith('.'):
                         attr = attr[1:]
-                    print(f"{' ' * indent}{self.colorize(f'{offset:4d} {opname.ljust(20)} {attr}', self.COLOR_MAGENTA)}")
-                    self.assembly_string += f"\n{' ' * indent}{offset:4d} {opname.ljust(20)} {attr}"
+
+                    print(f"{' ' * indent}{self.colorize(f'{instruction.offset:4d} {instruction.opname.ljust(20)} {attr}', self.COLOR_MAGENTA)}")
+                    self.assembly_string += f"\n{' ' * indent}{instruction.offset:4d} {instruction.opname.ljust(20)} {attr}"
+                    printed = True
+                    continue
 
                 # Class detection
                 elif instruction.opname == "LOAD_NAME" and instruction.argval == "dataclass":
@@ -305,6 +310,11 @@ class Pydis:
                     next_code_is_class = True
                     is_class = True
                     continue
+
+                if not printed:
+                    line = f"{' ' * indent}{offset:4d} {self.colorize(opname.ljust(20), color)} {argrepr}"
+                    print(line)
+                    self.assembly_string += f"\n{' ' * indent}{offset:4d} {opname.ljust(20)} {argrepr}"
 
             except Exception as e:
                 errors += 1
