@@ -12,7 +12,7 @@
 
 ---
 
-# 🔬 pydys - Python PYC Deep Disassembler
+# 🔬 pydys - Python PYC Disassembler
 
 **A recursive Python bytecode disassembler that penetrates nested code objects, reconstructs function signatures, and generates human-readable annotated output.**  
 Supports **Python 3.8 → 3.14+**, **all opcodes**, **nested functions/classes**, **exception tables**, and **auto-requirements extraction**.  
