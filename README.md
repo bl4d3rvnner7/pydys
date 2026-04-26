@@ -18,6 +18,8 @@
 Supports **Python 3.8 → 3.14+**, **all opcodes**, **nested functions/classes**, **exception tables**, and **auto-requirements extraction**.  
 Perfect for reverse engineering, malware analysis, CTF challenges, and understanding compiled Python code.
 
+![Preview](preview.png)
+
 ---
 
 ## 📑 Table of Contents
