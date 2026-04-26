@@ -39,10 +39,10 @@ MAX_ERROR_COUNT = 10
 class Pydis:
     """
     Main disassembler class for recursive PYC file analysis.
-    
+
     This class handles reading PYC files, recursively disassembling nested code objects,
     cleaning opcode output, and exporting results in various formats.
-    
+
     Attributes:
         no_color (bool): Disable colored terminal output
         json_output (bool): Enable JSON export format
@@ -58,7 +58,7 @@ class Pydis:
     def __init__(self, no_color=False, json_output=False, modern_mode=False):
         """
         Initialize the Pydis disassembler with specified options.
-        
+
         Args:
             no_color (bool, optional): Disable ANSI color codes in output. Defaults to False.
             json_output (bool, optional): Enable JSON output format. Defaults to False.
@@ -81,35 +81,35 @@ class Pydis:
         self.COLOR_CYAN = '\x1b[96m'
         self.COLOR_WHITE = '\x1b[97m'
         self.COLOR_RESET = '\x1b[0m'
-        
+
     def colorize(self, text, color_code):
         """
         Apply ANSI color codes to text if color output is enabled.
-        
+
         Args:
             text (str): The text to colorize
             color_code (str): ANSI color code (e.g., '\x1b[91m' for red)
-            
+
         Returns:
             str: Colorized text if enabled, otherwise original text
         """
         if self.no_color:
             return text
         return f"{color_code}{text}{self.COLOR_RESET}"
-    
+
     def get_version_by_num(self, magic_number):
         """
         Convert Python magic number to human-readable version string.
-        
+
         Args:
             magic_number (int): Python PYC magic number from file header
-            
+
         Returns:
             str: Human-readable Python version string
         """
         if magic_number in PYTHON_MAGIC_NUMBERS:
             return PYTHON_MAGIC_NUMBERS[magic_number]
-        
+
         if magic_number >= 3600:
             return f"3.14+ (magic {magic_number})"
         elif magic_number >= 3550:
@@ -118,22 +118,22 @@ class Pydis:
             return "3.12+"
         elif magic_number >= 3400:
             return "3.8–3.11"
-        
+
         if magic_number < 3000:
             return "< 3.0"
         minor = (magic_number - 2900) // 50
         return f"3.{minor} (approx)"
-    
+
     def read_pyc_file(self, filename):
         """
         Read and parse a PYC file, extracting the code object.
-        
+
         Args:
             filename (str): Path to the PYC file
-            
+
         Returns:
             tuple: (code_object, version_string)
-            
+
         Raises:
             SystemExit: If marshal loading fails (usually wrong Python version)
         """
@@ -149,28 +149,28 @@ class Pydis:
                 print(self.colorize(f"[V] Detected: {self.version}", self.COLOR_RED))
                 sys.exit(1)
         return code, self.version
-    
+
     def detect_version_only(self, filename):
         """
         Detect and display Python version without full disassembly.
-        
+
         Args:
             filename (str): Path to the PYC file
-            
+
         Returns:
             dict: Version information including magic number and recommended interpreter
         """
         with open(filename, 'rb') as f:
             magic_number = struct.unpack("<H", f.read(2))[0]
             version = self.get_version_by_num(magic_number)
-            
+
             result = {
                 "file": filename,
                 "magic_number": magic_number,
                 "python_version": version,
                 "recommended_interpreter": self.get_recommended_interpreter(version)
             }
-            
+
             if self.json_output:
                 print(json.dumps(result, indent=2))
             else:
@@ -179,14 +179,14 @@ class Pydis:
                 print(f"Python Version: {version}")
                 print(f"Recommended Interpreter: {result['recommended_interpreter']}")
             return result
-    
+
     def get_recommended_interpreter(self, version):
         """
         Generate pyenv command for installing required Python version.
-        
+
         Args:
             version (str): Python version string (e.g., "3.13+")
-            
+
         Returns:
             str: Command string for pyenv installation
         """
@@ -195,20 +195,20 @@ class Pydis:
             ver = match.group(1)
             return f"pyenv install {ver} && pyenv local {ver}"
         return "Check Python.org for appropriate version"
-    
-    def disassemble_code(self, code, indent=0):
+
+    def disassemble_code(self, code, indent=0, force_class=False, force_dataclass=False):
         """
         Recursively disassemble a code object and its nested children.
-        
+
         This is the core disassembly method that walks through bytecode instructions,
         cleans opcode output, and recursively processes nested code objects.
-        
+
         Args:
             code (code object): Python code object to disassemble
             indent (int, optional): Current indentation level for nested output. Defaults to 0.
         """
-        is_class = False
-        is_dataclass = False
+        is_class = force_class
+        is_dataclass = force_dataclass
         errors = 0
 
         print(f"\n{' ' * indent}{self.colorize('═' * 90, self.COLOR_WHITE)}")
@@ -233,8 +233,18 @@ class Pydis:
             print(f"{' ' * indent}{self.colorize('# Module level code', self.COLOR_GREEN)}")
             self.assembly_string += f"{' ' * indent}# Module level code\n"
         else:
-            print(f"{' ' * indent}{self.colorize('Possible Code : ', self.COLOR_GREEN)}{self.colorize(f'def {code.co_name}({args_string}):', self.COLOR_RED)}")
-            self.assembly_string += f"{' ' * indent}Possible Code : def {code.co_name}({args_string}):\n"
+            if is_dataclass:
+                signature = f"@dataclass\n{' ' * indent}class {code.co_name}:"
+            elif is_class:
+                signature = f"class {code.co_name}:"
+            else:
+                signature = f"def {code.co_name}({args_string}):"
+
+            print(f"{' ' * indent}{self.colorize('Possible Code : ', self.COLOR_GREEN)}{self.colorize(signature, self.COLOR_RED)}")
+            self.assembly_string += f"{' ' * indent}Possible Code : {signature}\n"
+
+        next_code_is_class = False
+        next_code_is_dataclass = False
 
         for instruction in dis.Bytecode(code, show_caches=True):
             try:
@@ -270,7 +280,8 @@ class Pydis:
                     nested = instruction.argval
                     print(f"\n{' ' * (indent + 4)}{self.colorize(f'→ Entering nested Code Object: {nested.co_name}', self.COLOR_YELLOW)}")
                     self.assembly_string += f"\n\n{' ' * (indent + 4)}→ Entering nested Code Object: {nested.co_name}\n"
-                    self.disassemble_code(nested, indent + 8)
+                    self.disassemble_code(nested, indent + 8, force_class=next_code_is_class, force_dataclass=next_code_is_dataclass)
+                    next_code_is_class = False
 
                 # LOAD_ATTR cleaning
                 elif instruction.opname == 'LOAD_ATTR':
@@ -289,8 +300,9 @@ class Pydis:
 
                 # Class detection
                 elif instruction.opname == "LOAD_NAME" and instruction.argval == "dataclass":
-                    is_dataclass = True
+                    next_code_is_dataclass = True
                 elif instruction.opname == "LOAD_BUILD_CLASS":
+                    next_code_is_class = True
                     is_class = True
                     continue
 
@@ -302,15 +314,15 @@ class Pydis:
                     break
 
         self.assembly_string += f"\n{' ' * indent}{'-' * 80}\n"
-    
+
     def save_assembly(self, filename, output_file=None):
         """
         Save the disassembly output to a file.
-        
+
         Args:
             filename (str): Original PYC filename (used for default output name)
             output_file (str, optional): Custom output file path. Defaults to None.
-            
+
         Returns:
             str: Path to the saved output file
         """
@@ -320,15 +332,15 @@ class Pydis:
             out_filename = filename.replace('.pyc', '.pyasm.full.txt')
         else:
             out_filename = filename + '.pyasm.full.txt'
-        
+
         with open(out_filename, 'w', encoding='utf-8') as f:
             f.write(self.assembly_string)
         return out_filename
-    
+
     def to_json(self):
         """
         Convert disassembly results to JSON-serializable dictionary.
-        
+
         Returns:
             dict: Complete analysis results including magic number, version, imports, and code objects
         """
@@ -342,10 +354,10 @@ class Pydis:
     def extract_requirements(self):
         """
         Generate requirements.txt content from detected imports.
-        
+
         Separates Python built-in modules from third-party packages and
         maps common package names to pip-installable requirements.
-        
+
         Returns:
             str: requirements.txt formatted content with comments
         """
@@ -360,7 +372,7 @@ class Pydis:
             'base64', 'binascii', 'urllib', 'http', 'email', 'xml', 'html', 'csv',
             'configparser', 'argparse', 'getopt', 'optparse', 'atexit', 'sysconfig'
         }
-        
+
         third_party_map = {
             'requests': 'requests>=2.28.0',
             'colorama': 'colorama>=0.4.6',
@@ -392,46 +404,46 @@ class Pydis:
             'cv2': 'opencv-python>=4.8.0',
             'tkinter': 'tk',
         }
-        
+
         requirements = []
         unknown = []
-        
+
         for imp in sorted(self.imports):
-            base_import = imp.split('.')[0]  
+            base_import = imp.split('.')[0]
             base_import = base_import.lower()
-            
+
             if base_import in builtins:
                 continue
             elif base_import in third_party_map:
                 requirements.append(third_party_map[base_import])
             else:
                 unknown.append(base_import)
-        
+
         output = []
         output.append("# Auto-generated by pydys")
         output.append(f"# From: {self.filename}")
         output.append(f"# Python version: {self.version}")
         output.append("")
-        
+
         if requirements:
             output.append("# Known third-party packages:")
             output.extend(sorted(set(requirements)))
             output.append("")
-        
+
         if unknown:
             output.append("# Unknown packages (manual review needed):")
             for pkg in sorted(set(unknown)):
                 output.append(f"# {pkg}")
-        
+
         return '\n'.join(output)
 
     def save_requirements(self, filename):
         """
         Save requirements.txt file from detected imports.
-        
+
         Args:
             filename (str): Original PYC filename (used for default output name)
-            
+
         Returns:
             str: Path to the saved requirements.txt file
         """
@@ -439,7 +451,7 @@ class Pydis:
         req_filename = filename.replace('.pyc', '_requirements.txt')
         if not req_filename.endswith('_requirements.txt'):
             req_filename = filename + '_requirements.txt'
-        
+
         with open(req_filename, 'w', encoding='utf-8') as f:
             f.write(req_content)
         return req_filename
@@ -447,11 +459,11 @@ class Pydis:
     def disassemble_pyc(self, filename, output_file=None, extract_requirements=False):
         """
         Main entry point for full PYC file disassembly.
-        
+
         Orchestrates the complete disassembly process: reading the file,
         detecting version, optionally extracting requirements, and
         performing recursive disassembly.
-        
+
         Args:
             filename (str): Path to the PYC file
             output_file (str, optional): Custom output file path. Defaults to None.
@@ -462,9 +474,9 @@ class Pydis:
         code, self.version = self.read_pyc_file(filename)
 
         print(self.colorize(f"[V] Detected Version: {self.version}", self.COLOR_BLUE))
-        
+
         print(self.colorize(f"[I] Imports: {', '.join(sorted(self.imports))}", self.COLOR_BLUE))
-        
+
         if extract_requirements:
             req_file = self.save_requirements(filename)
             print(self.colorize(f"[R] Requirements saved to: {req_file}", self.COLOR_GREEN))
@@ -475,14 +487,14 @@ class Pydis:
         dumpname = self.save_assembly(filename, output_file)
         print(self.colorize(f"\n[D] Full dump saved to: {dumpname}", self.COLOR_BLUE))
         print(self.colorize("[+] Done! Check the output file for complete structure.\n", self.COLOR_GREEN))
-        
+
         if self.json_output:
             print(json.dumps(self.to_json(), indent=2))
 
 def main():
     """
     Command-line interface for pydys.
-    
+
     Parses arguments and orchestrates either version detection or full disassembly.
     """
     parser = argparse.ArgumentParser(
@@ -497,7 +509,7 @@ Examples:
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    
+
     parser.add_argument("--file", "-f", dest="filename", help="PYC file to disassemble", required=True)
     parser.add_argument("--output", "-o", dest="output_file", help="Custom output file path (default: input_name.pyasm.full.txt)")
     parser.add_argument("--no-color", dest="no_color", action="store_true", help="Disable colored output (for CI/CD, logging)")
@@ -505,23 +517,23 @@ Examples:
     parser.add_argument("--modern", dest="modern_mode", action="store_true", help="Enable Python 3.11+ adaptive features (handles new opcodes)")
     parser.add_argument("--detect-version", dest="detect_only", action="store_true", help="Only detect Python version and exit (dry run)")
     parser.add_argument("--requirements", "-r", dest="extract_requirements", action="store_true", help="Extract requirements.txt from imports")
-    
+
     args = parser.parse_args()
-    
+
     if not Path(args.filename).exists():
         print(f"\x1b[91mError: File '{args.filename}' not found\x1b[0m")
         sys.exit(1)
-    
+
     pydis = Pydis(
         no_color=args.no_color,
         json_output=args.json_output,
         modern_mode=args.modern_mode
     )
-    
+
     if args.detect_only:
         pydis.detect_version_only(args.filename)
         return
-    
+
     # Full disassembly )
     pydis.disassemble_pyc(args.filename, args.output_file, args.extract_requirements)
 
